@@ -1,8 +1,14 @@
 const express = require("express");
 const app = express();
+
 // --- CSP (Report-Only) DEMO ---
-// Use REPORT_ONLY=true/false to switch between Report-Only and Blocking.
-const REPORT_ONLY = process.env.REPORT_ONLY !== "false"; // default true
+// Toggle whether the *app itself* adds CSP headers.
+// Default: true (handy for local dev). In Render/Fastly tests, set ENABLE_APP_CSP=false.
+const ENABLE_APP_CSP = process.env.ENABLE_APP_CSP !== "false";
+
+// Use REPORT_ONLY=true/false to switch between Report-Only and Blocking for app CSP.
+// Default: true (Report-Only).
+const REPORT_ONLY = process.env.REPORT_ONLY !== "false";
 
 // A policy that *allows* same-origin scripts and lodash from unpkg.
 // It does NOT allow scripts from evil.example.org, which will trigger a violation.
@@ -18,12 +24,18 @@ const cspDirectives = [
   "frame-ancestors 'self'"
 ].join("; ");
 
-app.use((req, res, next) => {
-  const headerName = REPORT_ONLY ? "Content-Security-Policy-Report-Only"
-                                 : "Content-Security-Policy";
-  res.setHeader(headerName, cspDirectives);
-  next();
-});
+// Only attach CSP headers if ENABLE_APP_CSP is true.
+// (When testing Fastly Client-Side Protection, set ENABLE_APP_CSP=false in Render.)
+if (ENABLE_APP_CSP) {
+  app.use((req, res, next) => {
+    const headerName = REPORT_ONLY
+      ? "Content-Security-Policy-Report-Only"
+      : "Content-Security-Policy";
+    res.setHeader(headerName, cspDirectives);
+    next();
+  });
+}
+
 // serve static assets
 app.use("/public", express.static("public"));
 
@@ -81,8 +93,9 @@ app.get("/profile", (_req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.get('/healthz', (req, res) => res.send('ok')); // simple health check
+// simple health check
+app.get("/healthz", (_req, res) => res.send("ok"));
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Demo listening on http://localhost:${PORT}`);
 });
