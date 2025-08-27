@@ -1,47 +1,6 @@
 const express = require("express");
 const app = express();
 
-/**
- * --- CSP (Report-Only) DEMO ---
- * Toggle whether the *app itself* adds CSP headers.
- * Default: true (handy for local dev). In Render/Fastly tests, set ENABLE_APP_CSP=false.
- */
-const ENABLE_APP_CSP = process.env.ENABLE_APP_CSP == "false";
-
-/**
- * Use REPORT_ONLY=true/false to switch between Report-Only and Blocking for app CSP.
- * Default: true (Report-Only).
- */
-const REPORT_ONLY = process.env.REPORT_ONLY == "false";
-
-/**
- * A policy that *allows* same-origin scripts and lodash from unpkg.
- * It does NOT allow scripts from evil.example.org, which will trigger a violation.
- */
-const cspDirectives = [
-  "default-src 'self'",
-  "script-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://ajax.googleapis.com",
-  "img-src 'self' https://picsum.photos data:",
-  "font-src 'self' https://fonts.gstatic.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "frame-ancestors 'self'"
-].join("; ");
-
-// Only attach CSP headers if ENABLE_APP_CSP is true.
-// (When testing Fastly Client-Side Protection, set ENABLE_APP_CSP=false in Render.)
-if (ENABLE_APP_CSP) {
-  app.use((req, res, next) => {
-    const headerName = REPORT_ONLY
-      ? "Content-Security-Policy-Report-Only"
-      : "Content-Security-Policy";
-    res.setHeader(headerName, cspDirectives);
-    next();
-  });
-}
-
 // Serve static assets
 app.use("/public", express.static("public"));
 
@@ -57,7 +16,7 @@ app.get("/", (_req, res) => {
   `);
 });
 
-// Page 1: Checkout (lots of scripts for Fastly inventory)
+// Page 1: Checkout (lots of scripts for inventory)
 app.get("/checkout", (_req, res) => {
   res.send(`
     <html>
@@ -83,7 +42,7 @@ app.get("/checkout", (_req, res) => {
         <script src="https://cdn.jsdelivr.net/npm/axios@1.7.7/dist/axios.min.js"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
-        <!-- Deliberate violation to generate a report -->
+        <!-- Deliberate violation domain (will be blocked by Fastly CSP when enabled there) -->
         <script src="https://evil.example.org/x.js"></script>
       </body>
     </html>
